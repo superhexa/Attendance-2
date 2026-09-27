@@ -29,7 +29,12 @@ export default function Announcements() {
   const [form, setForm] = useState(EMPTY);
   const { data = [], isLoading } = useQuery({ queryKey: ["announcements"], queryFn: async () => (await api.get("/announcements")).data });
 
-  useEffect(() => { if (sp.get("new") && can("announcements.create")) { setOpen(true); setSp({}); } }, [sp]);
+  useEffect(() => {
+    if (sp.get("new") && can("announcements.create")) {
+      setOpen(true);
+      setSp({});
+    }
+  }, [sp, can, setSp]);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   const save = async () => {

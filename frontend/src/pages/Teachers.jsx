@@ -107,7 +107,13 @@ export default function Teachers() {
   const [importOpen, setImportOpen] = useState(false);
 
   useEffect(() => { const id = setTimeout(() => setDebounced(search), 300); return () => clearTimeout(id); }, [search]);
-  useEffect(() => { if (sp.get("new") && can("teachers.create")) { setEditing(null); setDialog(true); setSp({}); } }, [sp]);
+  useEffect(() => {
+    if (sp.get("new") && can("teachers.create")) {
+      setEditing(null);
+      setDialog(true);
+      setSp({});
+    }
+  }, [sp, can, setSp]);
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["teachers", debounced],

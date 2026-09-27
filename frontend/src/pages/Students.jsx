@@ -105,7 +105,13 @@ export default function Students() {
   const [importOpen, setImportOpen] = useState(false);
 
   useEffect(() => { const id = setTimeout(() => setDebounced(search), 300); return () => clearTimeout(id); }, [search]);
-  useEffect(() => { if (sp.get("new") && can("students.create")) { setEditing(null); setDialog(true); setSp({}); } }, [sp]);
+  useEffect(() => {
+    if (sp.get("new") && can("students.create")) {
+      setEditing(null);
+      setDialog(true);
+      setSp({});
+    }
+  }, [sp, can, setSp]);
 
   const { data: grades = [] } = useGrades();
   const { data: sections = [] } = useSections(gradeId !== "all" ? { grade_id: gradeId } : {});

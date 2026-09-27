@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -78,15 +78,18 @@ function AttendanceSheet({ timetableId, date, onBack }) {
   const [qrData, setQrData] = useState(null);
   const { data: settings } = useQuery({ queryKey: ["settings"], queryFn: async () => (await api.get("/settings")).data });
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const { data } = await api.get("/attendance/roster", { params: { timetable_id: timetableId, date } });
       setRoster(data.roster.map((r) => ({ ...r })));
       setLesson(data.lesson); setLocked(data.locked);
     } catch (e) { toast.error(apiError(e)); } finally { setLoading(false); }
-  };
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [timetableId, date]);
+  }, [timetableId, date]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const setStatus = (id, status) => setRoster((r) => r.map((s) => (s.student_id === id ? { ...s, status } : s)));
   const markAll = () => setRoster((r) => r.map((s) => ({ ...s, status: "PRESENT" })));
