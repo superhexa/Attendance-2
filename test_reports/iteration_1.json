@@ -1,0 +1,46 @@
+{
+  "summary": "First-iteration end-to-end testing. Backend: 38/38 pytest cases pass (auth, RBAC, teacher scope, structure, subjects, students, teachers, timetable conflict, attendance submit/lock/correction workflow, reports+CSV, analytics, announcements, notifications, audit, settings/backup, search, sessions, 2FA setup, negative 401/403). Frontend: Director & Teacher login flows work, KPIs populated, all main navigation pages render without error, teacher route guards correctly redirect /users, /settings, /audit to /dashboard, take-attendance shows locked banner + request-correction per student when session already locked, global search opens.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/students", "issue": "Soft-deleted students keep their student_number, and the unique index does not exclude deleted docs. Re-inserting a student with a previously-used student_number raises pymongo.DuplicateKeyError which is caught by the generic 500 handler ('حدث خطأ غير متوقع'). Should either (a) unset student_number on soft delete or (b) catch DuplicateKeyError and return 400 with a friendly message like the pre-check does."},
+      {"endpoint": "POST /api/auth/login", "issue": "Login body Pydantic model uses plain `email: str` (not EmailStr). Not a bug per se; consider validation. Also the model has no `otp` field yet `getattr(body, 'otp', None)` is read on 2FA gate — dead code."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Global search / other dialogs", "issue": "Radix DialogContent warnings: 'DialogContent requires a DialogTitle for the component to be accessible' and 'Missing Description or aria-describedby'. Should wrap search command dialog title in VisuallyHidden or add DialogTitle/Description.", "selector": "[data-testid=\"global-search-input\"] dialog", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Director dashboard - Class comparison chart", "issues": ["Only one section has attendance data so bar chart is very sparse; visually the left side of the card looks empty. Consider empty-state text when only a single section has data."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Fix POST /api/students soft-delete unique-index conflict: either null out student_number on delete OR wrap the insert_one in try/except DuplicateKeyError -> HTTPException(400).",
+    "Silence Radix DialogContent accessibility warnings by adding DialogTitle/Description (or VisuallyHidden) in the global search command dialog and any other headerless dialogs.",
+    "Remove dead 2FA `otp` read on LoginBody or add `otp: Optional[str] = None` field."
+  ],
+  "critical_code_review_comments": [
+    "seed_admin resets password on password change but never rotates existing DIRECTOR record beyond password_hash (fine).",
+    "routes_users.create_user does not enforce uniqueness on username (only email). Duplicate usernames may cause confusion but no crash.",
+    "Server-wide exception handler masks all errors as 500 with a generic Arabic message. Consider catching DuplicateKeyError globally to return 409/400.",
+    "MongoDB _id is consistently excluded via {\"_id\":0} projections – good.",
+    "CORS origins default to '*' when CORS_ORIGINS missing but the app also uses allow_credentials=True and SameSite=None cookies. Starlette silently drops credentials with wildcard origins; ensure CORS_ORIGINS is explicitly set in .env for production.",
+    "Announcement create ignores expire_date filter in list (query built but not used with anns list find)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py"
+  ],
+  "success_rate": {"backend": "100% (38/38)", "frontend": "100% for tested flows"},
+  "test_credentials": "Director: bit675887@gmail.com / Director@2027 ; Teacher: teacher1@school.edu / Teacher@2027 (teacher password was reset to seed value via direct Mongo update after admin-reset-password test).",
+  "seed_data_creation": "Used existing seeded data (2026/2027 year, 3 grades, 4 sections, 4 subjects, 1 teacher, 6 students, today's timetable + submitted attendance). Tests create TEST_-prefixed transient records and clean them up.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All backend tests are in /app/backend/tests/backend_test.py and run via `python -m pytest backend_test.py -v --junitxml=/app/test_reports/pytest/pytest_results.xml`. The suite is idempotent thanks to unique-suffix email/student_number generation. If test_reset_password runs after a previous crashed run, the teacher1 password may be temporarily invalidated — the test now creates a throwaway teacher instead, but if you see 401 on TEACHER fixture, run the small Mongo update to reset teacher1 password to Teacher@2027 (bcrypt update on users.email='teacher1@school.edu').",
+  "rca of the issue": "No blocking issue. The only failing status observed initially (500 on student create) had two root causes: (1) The test used a hard-coded student_number 'TEST_9999' that persisted in soft-deleted docs from prior runs, colliding with the unique sparse index. (2) The create_student endpoint does an existence pre-check with {'deleted':{'$ne':True}} but the DB unique index does not filter deleted rows, so a genuine duplicate slips past the pre-check and raises pymongo DuplicateKeyError, which the global exception handler converts to a generic 500. Mitigation: test uses uuid-based student_number. Recommended fix in backend: catch DuplicateKeyError in create_student and return 400, and/or unset student_number in delete_student."
+}
